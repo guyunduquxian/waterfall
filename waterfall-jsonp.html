@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>瀑布流网页</title>
+	<style type="text/css">
+        * {
+            padding: 0;
+            margin: 0;
+        }
+
+        body {
+            background-color: #ccc;
+        }
+
+        .box {
+            width: 790px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .waterfall {
+                       
+        }
+
+        .waterfall .grid {
+            width: 230px;
+            position: absolute;
+            padding: 10px;
+            border-radius: 14px;
+            background-color: #fff;
+        }
+
+        .waterfall .grid img {
+            width: 230px;
+        }
+
+        .loading {
+            width: 400px;
+            text-align: center;
+            font-size: 14px;
+            background-color: #cc4;
+            color: #fff;
+            line-height: 30px;
+            position: absolute;
+            top: 0px;
+            left: 50%;
+            margin-left: -200px;
+        }
+   
+	</style>
+      
+</head>
+<body>
+    <div class="box">
+        <div class="waterfall"></div>
+        <div class="loading">正在加载...</div>
+    </div> 
+    
+    <script type="text/template" id="grid_template">
+        <div class="grid">
+            <img src="data/<%= imgurl %>">
+            <p class="title"><%= title %></p>
+            <p class="content"><%= content %></p>
+            <p class="author"><% author %></p>
+        </div>
+
+    </script>
+    
+    <script type="text/javascript" src="jq/jquery-3.3.1.min.js"></script>
+    <script type="text/javascript" src="js/underscore.js"></script>
+
+    <script type="text/javascript">
+        // 得到模板字符串
+        var templateString = $("#grid_template").html();
+
+        // 用underscore生成一个数据绑定函数
+        var compile = _.template(templateString);
+        // console.log(compile);
+
+        // 定义数组存储当前n个列的总高度
+        var colHeight = [0,0,0];        
+        var minValue = 0;
+        var minIndex = 0;
+
+        var maxIndex = 0;
+
+        var page = 1;
+
+        getJsonpMsg(page);
+        function getJsonpMsg(page) {
+            getMsg("data/jsonp/jsonp"+page+".txt","fn",function(data) {
+                // console.log(data);
+                // 没有更多数据时
+                if(data.message.length == 0) {
+                    $(".loading").show(2000).html("没有更多的数据");
+                    $(".loading").css("top",maxIndex+30+"px");
+                    return;
+                }
+
+                _.each(data.message,function(dictionary) {
+                    // 谁先加载完 先处理谁
+                    var img = new Image();
+                    img.src = "data/" + dictionary.imgurl;
+
+                    // jquery  load事件
+                    $(img).on("load",function() {
+                      
+                        // 图片加载完毕后 处理该图片
+                        var domString = compile(dictionary); 
+
+                        var $grid = $(domString);
+                        // 追加
+                        $(".waterfall").append($grid);
+                        // 找到最短列是谁
+                        minValue = _.min(colHeight);
+                        // 找到最短列所在列数index
+                        minIndex = _.indexOf(colHeight,minValue);
+
+                        $grid.css({
+                            "top":minValue,
+                            "left":minIndex*270
+                        });
+
+                        colHeight[minIndex] += $grid.outerHeight()+20;
+
+                        maxIndex = _.max(colHeight);
+                        // console.log(maxIndex);
+                        // 隐藏loading文本
+                        $(".loading").hide();
+                    });
+                });
+
+                lock = true;
+            });
+
+            function getMsg(url,name,fun) {
+                // 创建script标签
+                var script = document.createElement("script");
+                //  追加script
+                document.body.appendChild(script);
+                
+                script.src = url;
+                
+                //把此子函数定义为全局函数，以便父函数外面调用此子函数
+                window[name] = fun;
+
+                // 删除这个script标签
+                document.body.removeChild(script);
+            }
+            
+        }
+
+        var lock = true;
+        // 监听滚动
+        $(window).on("scroll",function() {
+            if (!lock) {
+                return;
+            }
+
+            var rate = $(window).scrollTop()/($(document).height()-$(window).height());
+
+            if(rate>=0.7) {
+                page++;
+                getJsonpMsg(page);
+                lock = false;
+            }
+        });
+    </script>
+</body>
+</html>
